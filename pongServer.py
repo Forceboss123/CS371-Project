@@ -1,6 +1,6 @@
 # =================================================================================================
 # Contributing Authors:	    <Ryan Goin, James Parker, Nathan Rink >
-# Email Addresses:          <Ryan.Goin@uky.edu, >
+# Email Addresses:          <Ryan.Goin@uky.edu, James.Parker@uky.edu, Nathan.Rink@uky.edu>
 # Date:                     <11/19/2025>
 # Purpose:                  <How this file contributes to the project>
 # Misc:                     <Not Required.  Anything else you might want to include>
