@@ -83,7 +83,45 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
         # Your code here to send an update to the server on your paddle's information,
         # where the ball is and the current score.
         # Feel free to change when the score is updated to suit your needs/requirements
-        
+        try:
+            game_state = {
+                "type": "update",
+                "paddle_y": playerPaddleObj.rect.y,
+                "paddle_moving": playerPaddleObj.moving,
+                "sync": sync
+            }
+
+            #send data to server
+            message = json.dumps(game_state)
+            client.send(message.encode('utf-8'))
+
+            #recieve from server
+            client.settimeout(0.1)
+            try:
+                data=client.recv(4096)
+                if data:
+                    server_state= json.loads(data.decode('utf-8'))
+
+                    #updates opponent paddle position
+                    opponentPaddleObj.rect.y = server_state.get("opponent_y",opponentPaddleObj.rect.y)
+
+                    #updates ball pos
+                    ball.rect.x = server_state.get("ball_x",ball.rect.x)
+                    ball.rect.y = server_state.get("ball_y",ball.rect.y)
+
+                    #update score
+                    lScore = server_state.get("left_score",lScore)
+                    rScore = server_state.get("right_score",rScore)
+
+                    #check value of sync
+                    server_sync = server_state.get("sync",sync)
+                    if abs(server_sync-sync)>10:
+                        sync=server_sync
+
+            except socket.timeout:
+                pass
+        except json.JSONDecodeError:
+            pass
         
         # =========================================================================================
 
@@ -172,23 +210,69 @@ def joinServer(ip:str, port:str, errorLabel:tk.Label, app:tk.Tk) -> None:
     # port          A string holding the port the server is using
     # errorLabel    A tk label widget, modify it's text to display messages to the user (example below)
     # app           The tk window object, needed to kill the window
+    if not ip or not port:
+        errorLabel.config(text="Please enter both IP and Port")
+        errorLabel.update()
+        return
     
+    try:
+        port_num=int(port)
+        if port_num < 1 or port_num > 65535:
+            raise ValueError("Port must be between 1 and 65535")
+    except ValueError as e:
+        errorLabel.config(text=f"Invalid port {e}")
+        errorLabel.update()
+        return
     # Create a socket and connect to the server
-    # You don't have to use SOCK_STREAM, use what you think is best
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     # Get the required information from your server (screen width, height & player paddle, "left or "right)
+    try:
+        errorLabel.config(text=f"Connecting to {ip}:{port}...")
+        errorLabel.update()
+
+        #connect to server
+        client.connect((ip,port_num))
+
+        errorLabel.config(text="Connected! Waiting for game info")
+        errorLabel.update()
+
+        #recieve game config from server
+        data=client.recv(1024)
+        game_info= json.loads(data.decode('utf-8'))
+
+        screenWidth = game_info.get("screen_width",640)
+        screenHeight = game_info.get("screen_height",480)
+        playerPaddle = game_info.get("paddle","left")
+
+        errorLabel.config(text=f"Starting game as {playerPaddle} player")
+        errorLabel.update()
+
+        #close start screen and start game
+        app.withdraw()
+        playerGame(screenWidth, screenHeight, playerPaddle, client)
+        app.quit()
+
+    except ConnectionRefusedError:
+        errorLabel.config(text="Connection refused. Check server status")
+        errorLabel.update()
+        client.close()
+    except socket.timeout:
+        errorLabel.config(text="Connection timed out")
+        errorLabel.update()
+        client.close()
+    except json.JSONDecodeErorr:
+        errorLabel.config(text="Invalid response from server")
+        errorLabel.update()
+        client.close()
+    except Exception as e:
+        errorLabel.config(text=f"Error: {str(e)}")
+        errorLabel.update()
+        client.close()
 
 
-    # If you have messages you'd like to show the user use the errorLabel widget like so
-    errorLabel.config(text=f"Some update text. You input: IP: {ip}, Port: {port}")
-    # You may or may not need to call this, depending on how many times you update the label
-    errorLabel.update()     
 
-    # Close this window and start the game with the info passed to you from the server
-    #app.withdraw()     # Hides the window (we'll kill it later)
-    #playGame(screenWidth, screenHeight, ("left"|"right"), client)  # User will be either left or right paddle
-    #app.quit()         # Kills the window
+
 
 
 # This displays the opening screen, you don't need to edit this (but may if you like)
