@@ -5,7 +5,7 @@ Contact Info
 Group Members & Email Addresses:
 
     Ryan Goin, person1@uky.edu
-    Nathan Rink, person2@uky.edu
+    Nathan Rink, nari236@uky.edu
     James Parker, jspa253@uky.edu
 
 Versioning
@@ -27,4 +27,5 @@ Run the following line to install the required libraries for this project:
 Known Bugs
 ==========
 - The server doesn't work because the logic isn't yet written.
+
 - The client doesn't speak to the server
