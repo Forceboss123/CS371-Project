@@ -10,7 +10,6 @@ import pygame
 import tkinter as tk
 import sys
 import socket
-import json
 
 from helperCode import *
 
@@ -85,44 +84,32 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
         # where the ball is and the current score.
         # Feel free to change when the score is updated to suit your needs/requirements
         try:
-            game_state = {
-                "type": "update",
-                "paddle_y": playerPaddleObj.rect.y,
-                "paddle_moving": playerPaddleObj.moving,
-                "sync": sync
-            }
-
             #send data to server
-            message = json.dumps(game_state)
-            client.send(message.encode('utf-8'))
+            message = f"{playerPaddleObj.rect.y} {ball.rect.x} {ball.rect.y} {lScore} {rScore} {sync}\n"
+            client.send(message.encode())
 
             #recieve from server
             client.settimeout(0.1)
             try:
                 data=client.recv(4096)
                 if data:
-                    server_state= json.loads(data.decode('utf-8'))
-
-                    #updates opponent paddle position
-                    opponentPaddleObj.rect.y = server_state.get("opponent_y",opponentPaddleObj.rect.y)
-
-                    #updates ball pos
-                    ball.rect.x = server_state.get("ball_x",ball.rect.x)
-                    ball.rect.y = server_state.get("ball_y",ball.rect.y)
-
-                    #update score
-                    lScore = server_state.get("left_score",lScore)
-                    rScore = server_state.get("right_score",rScore)
-
-                    #check value of sync
-                    server_sync = server_state.get("sync",sync)
-                    if abs(server_sync-sync)>10:
-                        sync=server_sync
-
+                    parts = data.decode().strip().split()
+                if len(parts) >= 6:
+                    opponentPaddleObj.rect.y = int(parts[0])
+                    ball.rect.x=int(parts[1])
+                    ball.rect.y=int(parts[2])
+                    lScore = int(parts[3])
+                    rScore=int(parts[4])
+                    opponent_sync=int(parts[5])
+                if opponent_sync > sync:
+                    sync = opponent_sync
             except socket.timeout:
                 pass
-        except json.JSONDecodeError:
-            pass
+            except (ValueError, IndexError):
+                pass
+        except Exception as e:
+            print(f"Error with communication: {e}")
+
         
         # =========================================================================================
 
@@ -239,19 +226,25 @@ def joinServer(ip:str, port:str, errorLabel:tk.Label, app:tk.Tk) -> None:
         errorLabel.update()
 
         #recieve game config from server
-        data=client.recv(1024)
-        game_info= json.loads(data.decode('utf-8'))
+        data=client.recv(1024).decode().strip()
 
-        screenWidth = game_info.get("screen_width",640)
-        screenHeight = game_info.get("screen_height",480)
-        playerPaddle = game_info.get("paddle","left")
+        if not data.startswith("CONFIG"):
+            raise ValueError("Invalid response from server")
+        
+        parts = data.split()
+        if len(parts) != 4:
+            raise ValueError("CONFIG message is messed up")
+
+        screenWidth = int(parts[1])
+        screenHeight = int(parts[2])
+        playerPaddle = parts[3]
 
         errorLabel.config(text=f"Starting game as {playerPaddle} player")
         errorLabel.update()
 
         #close start screen and start game
         app.withdraw()
-        playerGame(screenWidth, screenHeight, playerPaddle, client)
+        playGame(screenWidth, screenHeight, playerPaddle, client)
         app.quit()
 
     except ConnectionRefusedError:
@@ -262,7 +255,7 @@ def joinServer(ip:str, port:str, errorLabel:tk.Label, app:tk.Tk) -> None:
         errorLabel.config(text="Connection timed out")
         errorLabel.update()
         client.close()
-    except json.JSONDecodeErorr:
+    except (ValueError, IndexError) as e:
         errorLabel.config(text="Invalid response from server")
         errorLabel.update()
         client.close()
