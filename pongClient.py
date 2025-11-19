@@ -67,6 +67,7 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
         # Getting keypress events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                client.close()
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
@@ -89,20 +90,24 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
             client.send(message.encode())
 
             #recieve from server
-            client.settimeout(0.1)
+            client.settimeout(0.016)
             try:
                 data=client.recv(4096)
                 if data:
+                    #goes through opponents data
                     parts = data.decode().strip().split()
-                if len(parts) >= 6:
-                    opponentPaddleObj.rect.y = int(parts[0])
-                    ball.rect.x=int(parts[1])
-                    ball.rect.y=int(parts[2])
-                    lScore = int(parts[3])
-                    rScore=int(parts[4])
+                    if len(parts) >= 6:
+                        opponentPaddleObj.rect.y = int(parts[0])
+                    #updates ball and score from the left player
+                    if playerPaddle == "right":
+                        ball.rect.x=int(parts[1])
+                        ball.rect.y=int(parts[2])
+                        lScore = int(parts[3])
+                        rScore=int(parts[4])
                     opponent_sync=int(parts[5])
-                if opponent_sync > sync:
-                    sync = opponent_sync
+                    #checks sync
+                    if opponent_sync > sync:
+                        sync = opponent_sync
             except socket.timeout:
                 pass
             except (ValueError, IndexError):
@@ -171,7 +176,8 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
         pygame.draw.rect(screen, WHITE, topWall)
         pygame.draw.rect(screen, WHITE, bottomWall)
         scoreRect = updateScore(lScore, rScore, screen, WHITE, scoreFont)
-        pygame.display.update([topWall, bottomWall, ball, leftPaddle, rightPaddle, scoreRect, winMessage])
+        #pygame.display.update([topWall, bottomWall, ball, leftPaddle, rightPaddle, scoreRect, winMessage])
+        pygame.display.flip()
         clock.tick(60)
         
         # This number should be synchronized between you and your opponent.  If your number is larger
@@ -300,9 +306,9 @@ def startScreen():
     app.mainloop()
 
 if __name__ == "__main__":
-    #startScreen()
+    startScreen()
     
     # Uncomment the line below if you want to play the game without a server to see how it should work
     # the startScreen() function should call playGame with the arguments given to it by the server this is
     # here for demo purposes only
-    playGame(640, 480,"left",socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+    #playGame(640, 480,"left",socket.socket(socket.AF_INET, socket.SOCK_STREAM))
