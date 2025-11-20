@@ -98,16 +98,16 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
                     parts = data.decode().strip().split()
                     if len(parts) >= 6:
                         opponentPaddleObj.rect.y = int(parts[0])
-                    #updates ball and score from the left player
-                    if playerPaddle == "right":
-                        ball.rect.x=int(parts[1])
-                        ball.rect.y=int(parts[2])
-                        lScore = int(parts[3])
-                        rScore=int(parts[4])
-                    opponent_sync=int(parts[5])
+                        #updates ball and score from the server
+                        if playerPaddle == "right":
+                            ball.rect.x=int(parts[1])
+                            ball.rect.y=int(parts[2])
+                            lScore = int(parts[3])
+                            rScore=int(parts[4])
+                        opponent_sync=int(parts[5])
                     #checks sync
-                    if opponent_sync > sync:
-                        sync = opponent_sync
+                        if opponent_sync > sync:
+                            sync = opponent_sync
             except socket.timeout:
                 pass
             except (ValueError, IndexError):
@@ -137,30 +137,31 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
         else:
 
             # ==== Ball Logic =====================================================================
-            ball.updatePos()
+            if playerPaddle == "left":
+                ball.updatePos()
 
             # If the ball makes it past the edge of the screen, update score, etc.
-            if ball.rect.x > screenWidth:
-                lScore += 1
-                pointSound.play()
-                ball.reset(nowGoing="left")
-            elif ball.rect.x < 0:
-                rScore += 1
-                pointSound.play()
-                ball.reset(nowGoing="right")
+                if ball.rect.x > screenWidth:
+                    lScore += 1
+                    pointSound.play()
+                    ball.reset(nowGoing="left")
+                elif ball.rect.x < 0:
+                    rScore += 1
+                    pointSound.play()
+                    ball.reset(nowGoing="right")
                 
-            # If the ball hits a paddle
-            if ball.rect.colliderect(playerPaddleObj.rect):
-                bounceSound.play()
-                ball.hitPaddle(playerPaddleObj.rect.center[1])
-            elif ball.rect.colliderect(opponentPaddleObj.rect):
-                bounceSound.play()
-                ball.hitPaddle(opponentPaddleObj.rect.center[1])
+                # If the ball hits a paddle
+                if ball.rect.colliderect(playerPaddleObj.rect):
+                    bounceSound.play()
+                    ball.hitPaddle(playerPaddleObj.rect.center[1])
+                elif ball.rect.colliderect(opponentPaddleObj.rect):
+                    bounceSound.play()
+                    ball.hitPaddle(opponentPaddleObj.rect.center[1])
                 
-            # If the ball hits a wall
-            if ball.rect.colliderect(topWall) or ball.rect.colliderect(bottomWall):
-                bounceSound.play()
-                ball.hitWall()
+                # If the ball hits a wall
+                if ball.rect.colliderect(topWall) or ball.rect.colliderect(bottomWall):
+                    bounceSound.play()
+                    ball.hitWall()
             
             pygame.draw.rect(screen, WHITE, ball)
             # ==== End Ball Logic =================================================================
