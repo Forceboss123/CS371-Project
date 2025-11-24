@@ -128,7 +128,7 @@ server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind((Host, Port))
 server.listen(10)
 
-
+#wait for players to connect
 print(f"Pong server is running on {Host}:{Port}")
 print("Waiting for 2 players")
 #accept player one
@@ -150,12 +150,13 @@ threading.Thread(target=handle_client, args=(conn1, addr1, 1), daemon=True).star
 threading.Thread(target=handle_client, args=(conn2, addr2, 2), daemon=True).start()
 
 print("Both player connected, Game is starting")
+#main loop to accept spectator connections and keep server alive
 while True:
     #accept spectator connections
     conn, addr = server.accept()
     with lock:
         spectators.append(conn)
-        conn.send(f"CONFIG {SCREEN_W} {SCREEN_H} spectator".encode())  # ← added
+        conn.send(f"CONFIG {SCREEN_W} {SCREEN_H} spectator".encode())
         threading.Thread(target=handle_spectator, args=(conn, addr), daemon=True).start()
         print("Spectator connected:", addr)
     #keep the main thread alive
