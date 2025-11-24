@@ -107,7 +107,7 @@ def handle_spectator(conn, addr):
 
     try:
         while True:
-            # spectators don't update anything, but they MAY send junk so read & ignore
+            # spectators don't update anything, but they might send junk so read and ignore
             data = conn.recv(4096)
             if not data:
                 break
