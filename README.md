@@ -15,7 +15,7 @@ Github Link: https://github.com/Forceboss123/CS371-Project
 
 General Info
 ============
-The program is ran by having one device launch the server and at least 2 clients connect to it through the GUI that they are given, the 2 clients are then put into a game of pong and play until one person gets 5 points, they are then able to press R to play again if they choose or close the window to disconnect from the server.
+The program is ran by having one device launch the server and at least 2 clients connect to it through the GUI that they are given, the 2 clients are then put into a game of pong and play until one person gets 5 points, they are then able to press R to play again if they choose or close the window to disconnect from the server. If any other clients join the game they are put into it as spectators with no control and cfan simply just watch the game happen
 
 Install Instructions
 ====================
