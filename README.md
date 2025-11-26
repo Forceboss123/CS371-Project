@@ -11,11 +11,11 @@ Group Members & Email Addresses:
 Versioning
 ==========
 
-Github Link: 
+Github Link: https://github.com/Forceboss123/CS371-Project
 
 General Info
 ============
-This file describes how to install/run your program and anything else you think the user should know
+The program is ran by having one device launch the server and at least 2 clients connect to it through the GUI that they are given, the 2 clients are then put into a game of pong and play until one person gets 5 points, they are then able to press R to play again if they choose or close the window to disconnect from the server.
 
 Install Instructions
 ====================
@@ -26,6 +26,4 @@ Run the following line to install the required libraries for this project:
 
 Known Bugs
 ==========
-- The server doesn't work because the logic isn't yet written.
-
-- The client doesn't speak to the server
+- None
