@@ -1,8 +1,10 @@
 # =================================================================================================
 # Contributing Authors:	    <Ryan Goin, James Parker, Nathan Rink >
 # Email Addresses:          <Ryan.Goin@uky.edu, James.Parker@uky.edu, Nathan.Rink@uky.edu>
-# Date:                     <11/19/2025>
-# Purpose:                  <How this file contributes to the project>
+# Date:                     <11/26/2025>
+# Purpose:                  This is the server code for a networked Pong game.  It accepts connections
+#                           from two players (and optional spectators), maintains the game state, and
+#                           relays updates between the clients to keep their game views synchronized.
 # Misc:                     <Not Required.  Anything else you might want to include>
 # =================================================================================================
 
@@ -76,6 +78,7 @@ def handle_client(conn: socket.socket, addr: tuple[str, int], player_id):
                         #build messages to send back
                         msgForP1 = f"{paddle_y[2]} {ball_x} {ball_y} {left_score} {right_score} {sync_val}\n"
                         msgForP2 = f"{paddle_y[1]} {ball_x} {ball_y} {left_score} {right_score} {sync_val}\n"
+                        msgForS = f"{paddle_y[1]} {paddle_y[2]} {ball_x} {ball_y} {left_score} {right_score} {sync_val}\n"
                         #send update game state to player 1 
                         if 1 in players:
                             try:
@@ -88,6 +91,12 @@ def handle_client(conn: socket.socket, addr: tuple[str, int], player_id):
                                 players[2].sendall(msgForP2.encode()) 
                             except OSError:
                                 pass
+                        #Always send updated game state to spectators
+                        try:
+                            for spec in spectators:
+                                spec.sendall(msgForS.encode())
+                        except OSError:
+                            pass
             except ValueError:
                 #if packet cant be parsed ignore and countinue
                 continue                      
@@ -101,63 +110,46 @@ def handle_client(conn: socket.socket, addr: tuple[str, int], player_id):
             players[player_id].close()
             del players[player_id]
 
-#handles messages from a spectator client
-def handle_spectator(conn, addr):
-    print(f"Spectator connected: {addr}")
-
-    try:
-        while True:
-            # spectators don't update anything, but they might send junk so read and ignore
-            data = conn.recv(4096)
-            if not data:
-                break
-    except OSError:
-        pass
-    
-    #cleans up after a spectator disconnects
-    print(f"Spectator disconnected: {addr}")
-    with lock:
-        if conn in spectators:
-            spectators.remove(conn)
-            conn.close()
-
 #create server socket
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 #Bind server to the host and port and listen for connections
 server.bind((Host, Port))
-server.listen(10)
+server.listen(3)
 
-#wait for players to connect
+
 print(f"Pong server is running on {Host}:{Port}")
 print("Waiting for 2 players")
-#accept player one
-conn1, addr1 = server.accept()
-players[1] = conn1
-print(f"Player 1 connected")
-#accept player two
-conn2, addr2 = server.accept()
-players[2] = conn2
-print(f"Player 2 connected")
-#config window
-screen_w = SCREEN_W
-screen_h = SCREEN_H
-#player 1 is left, while player 2 is on the right
-players[1].send(f"CONFIG {screen_w} {screen_h} left".encode())
-players[2].send(f"CONFIG {screen_w} {screen_h} right".encode())
-#Start seperate threads to handle each players msgs
-threading.Thread(target=handle_client, args=(conn1, addr1, 1), daemon=True).start()
-threading.Thread(target=handle_client, args=(conn2, addr2, 2), daemon=True).start()
 
-print("Both player connected, Game is starting")
-#main loop to accept spectator connections and keep server alive
+#keep the main thread alive
 while True:
-    #accept spectator connections
     conn, addr = server.accept()
+
     with lock:
-        spectators.append(conn)
-        conn.send(f"CONFIG {SCREEN_W} {SCREEN_H} spectator".encode())
-        threading.Thread(target=handle_spectator, args=(conn, addr), daemon=True).start()
-        print("Spectator connected:", addr)
-    #keep the main thread alive
+
+        #player 1
+        if 1 not in players:
+            players[1] = conn
+            addr1 = addr
+            print("Player 1 connected")
+
+        #player 2
+        elif 2 not in players:
+            players[2] = conn
+            addr2 = addr
+            print("Player 2 connected")
+
+            players[1].send(f"CONFIG {SCREEN_W} {SCREEN_H} left".encode())
+            players[2].send(f"CONFIG {SCREEN_W} {SCREEN_H} right".encode())
+            threading.Thread(target=handle_client, args=(players[1], addr1, 1), daemon=True).start()
+            threading.Thread(target=handle_client, args=(players[2], addr2, 2), daemon=True).start()
+            print("Both player connected, Game is starting")
+
+        #spectators
+        else:
+            spectators.append(conn)
+            conn.send(f"CONFIG {SCREEN_W} {SCREEN_H} spectator".encode())
+            threading.Thread(target=handle_client, args=(conn, addr, 3), daemon=True).start()
+            print("Spectator connected:", addr)
+
     time.sleep(0.01)

@@ -1,8 +1,10 @@
 # =================================================================================================
 # Contributing Authors:	    <Ryan Goin, James Parker, Nathan Rink >
 # Email Addresses:          <Ryan.Goin@uky.edu, James.Parker@uky.edu, Nathan.Rink@uky.edu>
-# Date:                     <The date the file was last edited>
-# Purpose:                  <How this file contributes to the project>
+# Date:                     11/26/2025
+# Purpose:                  This is the client code for a networked Pong game.  It connects to a server
+#                           to get game configuration information and then runs the main game loop,
+#                           sending and receiving game state updates to/from the server.
 # Misc:                     <Not Required.  Anything else you might want to include>
 # =================================================================================================
 
@@ -48,7 +50,12 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
 
     ball = Ball(pygame.Rect(screenWidth/2, screenHeight/2, 5, 5), -5, 0)
 
-    if playerPaddle == "left":
+    spectator = (playerPaddle == "spectator")
+
+    if spectator:
+        opponentPaddleObj = None
+        playerPaddleObj = None
+    elif playerPaddle == "left":
         opponentPaddleObj = rightPaddle
         playerPaddleObj = leftPaddle
     else:
@@ -70,15 +77,16 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
                 client.close()
                 pygame.quit()
                 sys.exit()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_DOWN:
-                    playerPaddleObj.moving = "down"
+            if not spectator:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_DOWN:
+                        playerPaddleObj.moving = "down"
 
-                elif event.key == pygame.K_UP:
-                    playerPaddleObj.moving = "up"
+                    elif event.key == pygame.K_UP:
+                        playerPaddleObj.moving = "up"
 
-            elif event.type == pygame.KEYUP:
-                playerPaddleObj.moving = ""
+                elif event.type == pygame.KEYUP:
+                    playerPaddleObj.moving = ""
 
         # =========================================================================================
         # Your code here to send an update to the server on your paddle's information,
@@ -86,8 +94,11 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
         # Feel free to change when the score is updated to suit your needs/requirements
         try:
             #send data to server
-            message = f"{playerPaddleObj.rect.y} {ball.rect.x} {ball.rect.y} {lScore} {rScore} {sync}\n"
-            client.send(message.encode())
+            if spectator:
+                pass
+            else:
+                message = f"{playerPaddleObj.rect.y} {ball.rect.x} {ball.rect.y} {lScore} {rScore} {sync}\n"
+                client.send(message.encode())
 
             #recieve from server
             client.settimeout(0.016)
@@ -96,27 +107,55 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
                 if data:
                     #goes through opponents data
                     parts = data.decode().strip().split()
-                    if len(parts) >= 6:
+                    # SPECTATOR update format (7 values):
+                    # p1Y p2Y ballX ballY lScore rScore sync
+                    if spectator and len(parts) >= 7:
+                        leftPaddle.rect.y = int(parts[0])
+                        rightPaddle.rect.y = int(parts[1])
+                        ball.rect.x = int(parts[2])
+                        ball.rect.y = int(parts[3])
+                        lScore = int(parts[4])
+                        rScore = int(parts[5])
+                        sync = int(parts[6])
+
+                    # PLAYER update format (6 values)
+                    elif not spectator and len(parts) >= 6:
                         opponentPaddleObj.rect.y = int(parts[0])
-                        #updates ball and score from the server
+
                         if playerPaddle == "right":
-                            ball.rect.x=int(parts[1])
-                            ball.rect.y=int(parts[2])
+                            ball.rect.x = int(parts[1])
+                            ball.rect.y = int(parts[2])
                             lScore = int(parts[3])
-                            rScore=int(parts[4])
-                        opponent_sync=int(parts[5])
-                    #checks sync
+                            rScore = int(parts[4])
+
+                        opponent_sync = int(parts[5])
                         if opponent_sync > sync:
                             sync = opponent_sync
+
             except socket.timeout:
                 pass
             except (ValueError, IndexError):
                 pass
+
         except Exception as e:
             print(f"Error with communication: {e}")
 
         
         # =========================================================================================
+        # spectator logic ends here — spectators do not simulate physics
+        if spectator:
+            # Draw center line
+            for i in centerLine:
+                pygame.draw.rect(screen, WHITE, i)
+
+            pygame.draw.rect(screen, WHITE, leftPaddle)
+            pygame.draw.rect(screen, WHITE, rightPaddle)
+            pygame.draw.rect(screen, WHITE, ball)
+
+            updateScore(lScore, rScore, screen, WHITE, scoreFont)
+            pygame.display.flip()
+            clock.tick(60)
+            continue
 
         # Update the player paddle and opponent paddle's location on the screen
         for paddle in [playerPaddleObj, opponentPaddleObj]:
