@@ -66,6 +66,8 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
     rScore = 0
 
     sync = 0
+    game_over = False
+    play_again_sent = False
 
     while True:
         # Wiping the screen
@@ -84,6 +86,15 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
 
                     elif event.key == pygame.K_UP:
                         playerPaddleObj.moving = "up"
+                    # PLAY AGAIN key
+                    elif event.key == pygame.K_r and game_over:
+                        # send PLAY_AGAIN only once until RESET
+                        if not play_again_sent:
+                            try:
+                                client.send(b"PLAY_AGAIN\n")
+                                play_again_sent = True
+                            except Exception:
+                                pass
 
                 elif event.type == pygame.KEYUP:
                     playerPaddleObj.moving = ""
@@ -97,6 +108,7 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
             if spectator:
                 pass
             else:
+                # players continue sending their frames even if game_over; server will ignore scoring changes once game_over is set
                 message = f"{playerPaddleObj.rect.y} {ball.rect.x} {ball.rect.y} {lScore} {rScore} {sync}\n"
                 client.send(message.encode())
 
@@ -107,6 +119,26 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
                 if data:
                     #goes through opponents data
                     parts = data.decode().strip().split()
+
+                    # handle server control messages first
+                    if parts[0] == "GAME_OVER":
+                        game_over = True
+                        play_again_sent = False  # allow sending new PLAY_AGAIN
+                        # don't change scores here — server already sent them in state messages
+                        continue
+                    elif parts[0] == "RESET":
+                        # server reset — reset local state
+                        lScore = 0
+                        rScore = 0
+                        sync = 0
+                        play_again_sent = False
+                        game_over = False
+                        # reset ball and paddles to centered positions
+                        ball.reset(nowGoing="left")
+                        leftPaddle.rect.y = (screenHeight//2)-(paddleHeight//2)
+                        rightPaddle.rect.y = (screenHeight//2)-(paddleHeight//2)
+                        continue
+
                     # SPECTATOR update format (7 values):
                     # p1Y p2Y ballX ballY lScore rScore sync
                     if spectator and len(parts) >= 7:
@@ -168,11 +200,21 @@ def playGame(screenWidth:int, screenHeight:int, playerPaddle:str, client:socket.
 
         # If the game is over, display the win message
         if lScore > 4 or rScore > 4:
+            game_over = True
             winText = "Player 1 Wins! " if lScore > 4 else "Player 2 Wins! "
-            textSurface = winFont.render(winText, False, WHITE, (0,0,0))
+
+            # WIN TEXT
+            textSurface = winFont.render(winText, True, WHITE)
             textRect = textSurface.get_rect()
-            textRect.center = ((screenWidth/2), screenHeight/2)
-            winMessage = screen.blit(textSurface, textRect)
+            textRect.center = (screenWidth/2, screenHeight/2)
+            screen.blit(textSurface, textRect)
+
+            # HINT TEXT
+            hint = winFont.render("Press R to play again", True, WHITE)
+            hintrect = hint.get_rect()
+            hintrect.center = (screenWidth/2, (screenHeight/2)+40)
+            screen.blit(hint, hintrect)
+
         else:
 
             # ==== Ball Logic =====================================================================
@@ -309,11 +351,6 @@ def joinServer(ip:str, port:str, errorLabel:tk.Label, app:tk.Tk) -> None:
         errorLabel.config(text=f"Error: {str(e)}")
         errorLabel.update()
         client.close()
-
-
-
-
-
 
 # This displays the opening screen, you don't need to edit this (but may if you like)
 def startScreen():
